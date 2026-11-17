@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hostel Market – Login</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="nav"></div>
+  <main class="container auth-wrap">
+    <div class="form-card" style="width:100%">
+      <div class="tabs">
+        <button class="active" data-t="login">Login</button>
+        <button data-t="register">Create account</button>
+      </div>
+
+      <form id="loginForm">
+        <div class="field"><label>Email</label><input type="email" name="email" required></div>
+        <div class="field"><label>Password</label><input type="password" name="password" required></div>
+        <button class="btn btn-primary btn-block">Login</button>
+      </form>
+
+      <form id="registerForm" hidden>
+        <div class="field"><label>Full name *</label><input name="name" required></div>
+        <div class="field"><label>Email *</label><input type="email" name="email" required></div>
+        <div class="two">
+          <div class="field"><label>Phone / WhatsApp *</label><input type="tel" name="phone" required></div>
+          <div class="field"><label>Hostel &amp; room</label><input name="hostel" placeholder="e.g. Block A, 204"></div>
+        </div>
+        <div class="field"><label>Password * (min 6 characters)</label><input type="password" name="password" minlength="6" required></div>
+        <button class="btn btn-primary btn-block">Create account</button>
+      </form>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    (async () => {
+      await initPage();
+      if (ME) { location.href = 'index.html'; return; }
+
+      const loginForm = $('#loginForm'), regForm = $('#registerForm');
+      document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+        document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
+        loginForm.hidden = b.dataset.t !== 'login';
+        regForm.hidden = b.dataset.t !== 'register';
+      });
+
+      function done(r) {
+        localStorage.setItem('token', r.token);
+        const next = new URLSearchParams(location.search).get('next');
+        location.href = next && /^[\w-]+\.html(\?[\w=&-]*)?$/.test(next) ? next : 'index.html';
+      }
+      async function submit(form, url) {
+        const data = Object.fromEntries(new FormData(form));
+        try { done(await api(url, { method: 'POST', json: data })); }
+        catch (e) { toast(e.message, 'error'); }
+      }
+      loginForm.onsubmit = e => { e.preventDefault(); submit(loginForm, '/api/login'); };
+      regForm.onsubmit = e => { e.preventDefault(); submit(regForm, '/api/register'); };
+    })();
+  </script>
+</body>
+</html>

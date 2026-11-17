@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hostel Market – My Profile</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="nav"></div>
+  <main class="container">
+    <div class="cover"></div>
+    <div class="profile-head" id="head"></div>
+    <div class="pstats" id="pstats"></div>
+
+    <div class="big-tabs">
+      <button class="active" data-t="mine">My listings</button>
+      <button data-t="wish">♥ Wishlist</button>
+    </div>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    (async () => {
+      if (!(await initPage({ active: 'profile', requireLogin: true }))) return;
+
+      $('#head').innerHTML = `
+        ${avatarHTML(ME, 'xl')}
+        <div class="info">
+          <h1>${esc(ME.name)}</h1>
+          <p class="muted">${esc(ME.hostel || 'Hostel not set')} · Joined ${new Date(ME.joinedAt).toLocaleDateString()}</p>
+          <p>${esc(ME.bio) || '<span class="muted">No bio yet.</span>'}</p>
+        </div>
+        <a class="btn btn-ghost" href="settings.html">⚙️ Edit profile</a>`;
+
+      let mine = [], wish = [], tab = location.hash === '#wishlist' ? 'wish' : 'mine';
+      const grid = $('#grid');
+      grid.innerHTML = Array(3).fill('<div class="card skeleton"></div>').join('');
+      try { [mine, wish] = await Promise.all([api('/api/items/mine'), api('/api/wishlist')]); }
+      catch (e) { toast(e.message, 'error'); }
+
+      function stats() {
+        const views = mine.reduce((s, i) => s + (i.views || 0), 0);
+        $('#pstats').innerHTML = [
+          [mine.length, 'Listings'], [mine.filter(i => !i.sold).length, 'Active'],
+          [mine.filter(i => i.sold).length, 'Sold'], [views, 'Total views'], [wish.length, 'Saved']
+        ].map(([n, l]) => `<div class="stat"><b>${n}</b><span>${l}</span></div>`).join('');
+      }
+
+      function render() {
+        document.querySelectorAll('.big-tabs button').forEach(b => b.classList.toggle('active', b.dataset.t === tab));
+        stats();
+        const list = tab === 'mine' ? mine : wish;
+        grid.innerHTML = list.length
+          ? list.map((it, i) => itemCard(it, i, { mine: tab === 'mine' })).join('')
+          : tab === 'mine'
+            ? '<div class="empty"><div>📦</div><h3>No listings yet</h3><p><a href="sell.html" style="color:var(--primary)">Sell your first item</a></p></div>'
+            : '<div class="empty"><div>♥</div><h3>Your wishlist is empty</h3><p>Tap the heart on any item to save it.</p></div>';
+      }
+      render();
+
+      document.querySelector('.big-tabs').onclick = e => {
+        const b = e.target.closest('button'); if (!b) return;
+        tab = b.dataset.t; render();
+      };
+
+      grid.onclick = async e => {
+        const act = e.target.closest('[data-act]');
+        if (act) {
+          const id = act.dataset.id;
+          try {
+            if (act.dataset.act === 'sold') {
+              const updated = await api(`/api/items/${id}/sold`, { method: 'POST' });
+              mine = mine.map(i => i.id === id ? updated : i);
+              toast(updated.sold ? 'Marked as sold 🎉' : 'Item relisted');
+            } else {
+              if (!confirm('Delete this listing permanently?')) return;
+              await api('/api/items/' + id, { method: 'DELETE' });
+              mine = mine.filter(i => i.id !== id);
+              toast('Listing deleted');
+            }
+            render();
+          } catch (err) { toast(err.message, 'error'); }
+          return;
+        }
+        const w = e.target.closest('[data-wish]');
+        if (w) {
+          e.stopPropagation();
+          const r = await toggleWish(w.dataset.wish, w);
+          if (r === false) { wish = wish.filter(i => i.id !== w.dataset.wish); setTimeout(render, 300); }
+          return;
+        }
+        if (tab === 'wish') {
+          const c = e.target.closest('.item');
+          if (c) showItem(wish.find(i => i.id === c.dataset.id));
+        }
+      };
+    })();
+  </script>
+</body>
+</html>

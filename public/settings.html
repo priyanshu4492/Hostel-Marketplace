@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hostel Market – Settings</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="nav"></div>
+  <main class="container">
+    <h1 class="page-title" style="text-align:center;margin-bottom:24px">Settings</h1>
+
+    <form class="form-card" id="profileForm">
+      <h2>Personal details</h2>
+      <div class="field" style="display:flex;align-items:center;gap:16px">
+        <div id="avatarBox"></div>
+        <label class="btn btn-ghost btn-sm" style="cursor:pointer">Change photo
+          <input type="file" name="avatar" id="avatarInput" accept="image/*" hidden>
+        </label>
+      </div>
+      <div class="field"><label>Full name</label><input name="name" required></div>
+      <div class="field"><label>Email (cannot be changed)</label><input id="email" readonly></div>
+      <div class="two">
+        <div class="field"><label>Phone / WhatsApp</label><input type="tel" name="phone" required></div>
+        <div class="field"><label>Hostel &amp; room</label><input name="hostel"></div>
+      </div>
+      <div class="field"><label>Bio</label><textarea name="bio" maxlength="200" placeholder="A short line about you..."></textarea></div>
+      <button class="btn btn-primary btn-block">Save changes</button>
+    </form>
+
+    <form class="form-card" id="pwForm">
+      <h2>Change password</h2>
+      <div class="field"><label>Current password</label><input type="password" name="current" required></div>
+      <div class="field"><label>New password</label><input type="password" name="next" minlength="6" required></div>
+      <button class="btn btn-primary btn-block">Update password</button>
+    </form>
+
+    <div class="form-card">
+      <h2>Appearance</h2>
+      <button class="btn btn-ghost" id="themeBtn2">🌓 Toggle dark / light mode</button>
+    </div>
+
+    <div class="form-card danger">
+      <h2>Danger zone</h2>
+      <p class="muted small" style="margin-bottom:14px">Deleting your account removes your profile and all your listings forever.</p>
+      <button class="btn btn-danger" id="delBtn">Delete my account</button>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    (async () => {
+      if (!(await initPage({ active: 'settings', requireLogin: true }))) return;
+
+      const f = $('#profileForm');
+      f.name.value = ME.name; f.phone.value = ME.phone;
+      f.hostel.value = ME.hostel; f.bio.value = ME.bio;
+      $('#email').value = ME.email;
+      $('#avatarBox').innerHTML = avatarHTML(ME, 'xl');
+
+      $('#avatarInput').onchange = e => {
+        const file = e.target.files[0]; if (!file) return;
+        $('#avatarBox').innerHTML = `<img class="avatar xl" src="${URL.createObjectURL(file)}" alt="">`;
+      };
+
+      f.onsubmit = async e => {
+        e.preventDefault();
+        try {
+          ME = await api('/api/me', { method: 'PUT', form: new FormData(f) });
+          renderNav('settings');
+          toast('Profile updated ✅');
+        } catch (err) { toast(err.message, 'error'); }
+      };
+
+      $('#pwForm').onsubmit = async e => {
+        e.preventDefault();
+        const data = Object.fromEntries(new FormData(e.target));
+        try {
+          await api('/api/me/password', { method: 'POST', json: data });
+          toast('Password changed ✅'); e.target.reset();
+        } catch (err) { toast(err.message, 'error'); }
+      };
+
+      $('#themeBtn2').onclick = toggleTheme;
+
+      $('#delBtn').onclick = async () => {
+        if (prompt('Type DELETE to permanently delete your account:') !== 'DELETE') return;
+        try {
+          await api('/api/me', { method: 'DELETE' });
+          localStorage.removeItem('token');
+          location.href = 'index.html';
+        } catch (err) { toast(err.message, 'error'); }
+      };
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hostel Market – Sell</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="nav"></div>
+  <main class="container">
+    <h1 class="page-title" id="heading" style="text-align:center">Sell an item</h1>
+    <p class="muted" style="text-align:center;margin-bottom:24px">Your name, hostel and phone are taken from your profile.</p>
+
+    <form class="form-card" id="form">
+      <div class="field"><label>Item name *</label><input name="title" placeholder="e.g. Scientific Calculator" required></div>
+      <div class="two">
+        <div class="field"><label>Price (₹) *</label><input type="number" name="price" min="0" required></div>
+        <div class="field"><label>Condition</label><select name="condition" id="cond"></select></div>
+      </div>
+      <div class="field"><label>Category</label><select name="category" id="cat"></select></div>
+      <div class="field"><label>Description</label><textarea name="description" placeholder="Age, condition, reason for selling..."></textarea></div>
+      <div class="field">
+        <label>Photo</label>
+        <label class="drop">
+          <input type="file" name="image" id="image" accept="image/*">
+          <span id="dropText">📷 Click to choose a photo (max 3 MB)</span>
+          <img id="preview" hidden alt="">
+        </label>
+      </div>
+      <button class="btn btn-primary btn-block" id="submitBtn">List item</button>
+    </form>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    (async () => {
+      if (!(await initPage({ active: 'sell', requireLogin: true }))) return;
+
+      $('#cat').innerHTML = CATEGORIES.map(c => `<option>${c}</option>`).join('');
+      $('#cond').innerHTML = CONDITIONS.map(c => `<option>${c}</option>`).join('');
+      const form = $('#form');
+      const editId = new URLSearchParams(location.search).get('edit');
+
+      $('#image').onchange = e => {
+        const f = e.target.files[0]; if (!f) return;
+        $('#preview').src = URL.createObjectURL(f);
+        $('#preview').hidden = false;
+        $('#dropText').textContent = '✅ ' + f.name;
+      };
+
+      if (editId) {
+        $('#heading').textContent = 'Edit your listing';
+        $('#submitBtn').textContent = 'Save changes';
+        try {
+          const it = (await api('/api/items/mine')).find(i => i.id === editId);
+          if (!it) throw new Error('Item not found.');
+          form.title.value = it.title; form.price.value = it.price;
+          form.category.value = it.category; form.condition.value = it.condition;
+          form.description.value = it.description;
+          if (it.image) { $('#preview').src = it.image; $('#preview').hidden = false; $('#dropText').textContent = '📷 Click to change photo'; }
+        } catch (e) { toast(e.message, 'error'); }
+      }
+
+      form.onsubmit = async e => {
+        e.preventDefault();
+        const btn = $('#submitBtn'); btn.disabled = true;
+        try {
+          await api(editId ? '/api/items/' + editId : '/api/items', {
+            method: editId ? 'PUT' : 'POST', form: new FormData(form)
+          });
+          toast(editId ? 'Listing updated!' : 'Item listed!');
+          setTimeout(() => location.href = 'profile.html', 700);
+        } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+      };
+    })();
+  </script>
+</body>
+</html>

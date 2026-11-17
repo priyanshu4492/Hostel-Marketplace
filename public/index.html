@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hostel Market – Browse</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="nav"></div>
+
+  <header class="hero">
+    <div class="container">
+      <h1>Buy &amp; sell with your <span class="grad">hostel mates</span></h1>
+      <p>Find cheap second-hand books, gadgets and furniture from students around you, or sell what you no longer need.</p>
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="sell.html">+ Sell an item</a>
+        <a class="btn btn-ghost" href="#browse">Browse items ↓</a>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+  </header>
+
+  <main class="container" id="browse">
+    <div class="toolbar">
+      <input id="search" placeholder="🔍  Search items...">
+      <select id="sort">
+        <option value="new">Newest first</option>
+        <option value="low">Price: low to high</option>
+        <option value="high">Price: high to low</option>
+      </select>
+      <label class="check"><input type="checkbox" id="showSold"> Show sold</label>
+    </div>
+    <div class="chips" id="chips"></div>
+    <p class="count" id="count"></p>
+    <div class="grid" id="grid"></div>
+  </main>
+
+  <script src="app.js"></script>
+  <script>
+    (async () => {
+      await initPage({ active: 'home' });
+      const grid = $('#grid');
+      let items = [], cat = 'All';
+
+      $('#chips').innerHTML = ['All', ...CATEGORIES]
+        .map(c => `<button class="chip ${c === 'All' ? 'active' : ''}" data-c="${c}">${c}</button>`).join('');
+      grid.innerHTML = Array(8).fill('<div class="card skeleton"></div>').join('');
+
+      try {
+        const [stats, list] = await Promise.all([api('/api/stats'), api('/api/items')]);
+        items = list;
+        $('#stats').innerHTML = [
+          ['available', 'Items available'], ['sold', 'Items sold'], ['students', 'Students']
+        ].map(([k, l]) => `<div class="stat"><b data-n="${stats[k]}">0</b><span>${l}</span></div>`).join('');
+        document.querySelectorAll('[data-n]').forEach(el => countUp(el, +el.dataset.n));
+      } catch (e) { toast(e.message, 'error'); }
+
+      function render() {
+        const q = $('#search').value.toLowerCase();
+        const showSold = $('#showSold').checked;
+        const sort = $('#sort').value;
+        const list = items.filter(i =>
+          (cat === 'All' || i.category === cat) &&
+          (showSold || !i.sold) &&
+          (i.title + ' ' + i.description).toLowerCase().includes(q));
+        if (sort === 'low') list.sort((a, b) => a.price - b.price);
+        if (sort === 'high') list.sort((a, b) => b.price - a.price);
+
+        $('#count').textContent = list.length + (list.length === 1 ? ' item found' : ' items found');
+        grid.innerHTML = list.length
+          ? list.map((it, i) => itemCard(it, i)).join('')
+          : '<div class="empty"><div>🔍</div><h3>Nothing here yet</h3><p>Be the first to <a href="sell.html" style="color:var(--primary)">list an item</a>!</p></div>';
+      }
+      render();
+
+      $('#search').oninput = render;
+      $('#sort').onchange = render;
+      $('#showSold').onchange = render;
+      $('#chips').onclick = e => {
+        const b = e.target.closest('.chip'); if (!b) return;
+        cat = b.dataset.c;
+        document.querySelectorAll('.chip').forEach(c => c.classList.toggle('active', c === b));
+        render();
+      };
+      grid.onclick = async e => {
+        const w = e.target.closest('[data-wish]');
+        if (w) {
+          e.stopPropagation();
+          const r = await toggleWish(w.dataset.wish, w);
+          if (r !== undefined) items.find(i => i.id === w.dataset.wish).wished = r;
+          return;
+        }
+        const c = e.target.closest('.item');
+        if (c) showItem(items.find(i => i.id === c.dataset.id));
+      };
+    })();
+  </script>
+</body>
+</html>
